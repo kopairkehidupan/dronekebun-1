@@ -15,8 +15,8 @@
 
     #modalMap, #modalVideo {
       width: 100%;
-      height: 50vh;
       border: none;
+      flex: 1;
     }
 
     .modal-dialog {
@@ -31,15 +31,9 @@
 
     .modal-body {
       padding: 0;
-      height: 100%;
+      height: calc(100vh - 56px); /* dikurangi tinggi footer */
       display: flex;
       flex-direction: column;
-    }
-
-    @media (max-width: 768px) {
-      #modalMap, #modalVideo {
-        height: 50vh;
-      }
     }
 
     .modal-footer {
@@ -47,23 +41,77 @@
       padding: 0.5rem;
       justify-content: center;
       gap: 0.5rem;
+      height: 56px;
+    }
+
+    /* Desktop/Layar besar */
+    @media (min-width: 992px) {
+      .modal-body {
+        flex-direction: row;
+      }
+      #modalVideo {
+        flex: 0 0 60%;
+        height: 100%;
+      }
+      #modalMap {
+        flex: 0 0 40%;
+        height: 100%;
+      }
+    }
+
+    /* Tablet */
+    @media (min-width: 768px) and (max-width: 991px) {
+      #modalVideo {
+        height: 60%;
+      }
+      #modalMap {
+        height: 40%;
+      }
+    }
+
+    /* Mobile */
+    @media (max-width: 767px) {
+      #modalVideo {
+        height: 50%;
+      }
+      #modalMap {
+        height: 50%;
+      }
+    }
+
+    /* Ketika tidak ada peta */
+    .no-map #modalMap {
+      display: none !important;
+    }
+    .no-map #modalVideo {
+      height: 100% !important;
+    }
+
+    /* Table styling */
+    .table-responsive {
+      overflow-x: auto;
+    }
+    th {
+      white-space: nowrap;
     }
   </style>
 </head>
 <body>
 
 <div class="container py-4">
-  <h3>Daftar Lokasi Pengambilan Video Drone</h3>
-  <table class="table table-bordered">
-    <thead>
-      <tr>
-        <th>Divisi</th>
-        <th>Nama Lokasi</th>
-        <th>Video</th>
-      </tr>
-    </thead>
-    <tbody id="flightTableBody"></tbody>
-  </table>
+  <h3 class="mb-4">Daftar Lokasi Pengambilan Video Drone</h3>
+  <div class="table-responsive">
+    <table class="table table-bordered table-hover">
+      <thead class="table-light">
+        <tr>
+          <th>Divisi</th>
+          <th>Nama Lokasi</th>
+          <th>Video</th>
+        </tr>
+      </thead>
+      <tbody id="flightTableBody"></tbody>
+    </table>
+  </div>
 </div>
 
 <!-- Modal -->
@@ -225,70 +273,73 @@
   let map, currentKml;
 
   function extractDivisi(name) {
-      const divMatch = name.match(/Divisi [IVX]+(?: [A-Za-z]+)?/);
-      if (divMatch) return divMatch[0];
+    const divMatch = name.match(/Divisi [IVX]+(?: [A-Za-z]+)?/);
+    if (divMatch) return divMatch[0];
     
-      if (name.includes("Areal Nembok")) return "Areal Nembok";
-      if (name.includes("Kantor Kebun Cucut")) return "Kantor Kebun Cucut";
+    if (name.includes("Areal Nembok")) return "Areal Nembok";
+    if (name.includes("Kantor Kebun Cucut")) return "Kantor Kebun Cucut";
     
-      return "Lainnya";
+    return "Lainnya";
+  }
+
+  // Buat struktur rowspan untuk divisi
+  let rowspanMap = new Map();
+  let divisiList = [];
+  let lastDivisi = "";
+  let rowIndexMap = new Map();
+  
+  for (let i = 0; i < flights.length; i++) {
+    const divisi = extractDivisi(flights[i].name);
+    divisiList.push(divisi);
+  
+    if (divisi !== lastDivisi) {
+      rowIndexMap.set(divisi, i); // index pertama muncul
+      rowspanMap.set(divisi, 1);
+      lastDivisi = divisi;
+    } else {
+      rowspanMap.set(divisi, rowspanMap.get(divisi) + 1);
+      divisiList[i] = ""; // tandai untuk tidak dirender ulang
     }
+  }
 
-    
-    let rowspanMap = new Map();
-      let divisiList = [];
-      let lastDivisi = "";
-      let rowIndexMap = new Map();
-      
-      for (let i = 0; i < flights.length; i++) {
-        const divisi = extractDivisi(flights[i].name);
-        divisiList.push(divisi);
-      
-        if (divisi !== lastDivisi) {
-          rowIndexMap.set(divisi, i); // index pertama muncul
-          rowspanMap.set(divisi, 1);
-          lastDivisi = divisi;
-        } else {
-          rowspanMap.set(divisi, rowspanMap.get(divisi) + 1);
-          divisiList[i] = ""; // tandai untuk tidak dirender ulang
-        }
-      }
-
-    
-    for (let i = 0; i < flights.length; i++) {
-      const flight = flights[i];
-      const divisi = extractDivisi(flight.name);
-      const tr = document.createElement("tr");
-    
-      // Kolom Divisi
-      if (divisiList[i] !== "") {
-        const tdDivisi = document.createElement("td");
-        tdDivisi.textContent = divisi;
-        tdDivisi.rowSpan = rowspanMap.get(divisi);
-        tr.appendChild(tdDivisi);
-      }
-    
-      // Kolom Nama Lokasi
-      const tdName = document.createElement("td");
-      tdName.textContent = flight.name;
-      tr.appendChild(tdName);
-    
-      // Kolom Tombol
-      const tdBtn = document.createElement("td");
-      tdBtn.innerHTML = `<button class="btn btn-primary btn-sm" onclick="openModal(${i})">Lihat</button>`;
-      tr.appendChild(tdBtn);
-    
-      tableBody.appendChild(tr);
+  // Render tabel
+  for (let i = 0; i < flights.length; i++) {
+    const flight = flights[i];
+    const divisi = extractDivisi(flight.name);
+    const tr = document.createElement("tr");
+  
+    // Kolom Divisi
+    if (divisiList[i] !== "") {
+      const tdDivisi = document.createElement("td");
+      tdDivisi.textContent = divisi;
+      tdDivisi.rowSpan = rowspanMap.get(divisi);
+      tr.appendChild(tdDivisi);
     }
-
+  
+    // Kolom Nama Lokasi
+    const tdName = document.createElement("td");
+    tdName.textContent = flight.name;
+    tr.appendChild(tdName);
+  
+    // Kolom Tombol
+    const tdBtn = document.createElement("td");
+    tdBtn.innerHTML = `<button class="btn btn-primary btn-sm" onclick="openModal(${i})">Lihat</button>`;
+    tr.appendChild(tdBtn);
+  
+    tableBody.appendChild(tr);
+  }
 
   function openModal(index) {
     const flight = flights[index];
     const videoFrame = document.getElementById("modalVideo");
     const mapContainer = document.getElementById("modalMap");
+    const modalBody = document.querySelector(".modal-body");
   
     const isVideoAvailable = flight.videoId && !flight.videoId.endsWith(".kml");
     const isKmlAvailable = flight.kml && flight.kml.trim() !== "";
+  
+    // Reset classes
+    modalBody.classList.remove("no-map");
   
     // Tampilkan video jika tersedia
     if (isVideoAvailable) {
@@ -299,11 +350,10 @@
       videoFrame.style.display = "none";
     }
   
-    // Tampilkan/hilangkan peta dan atur tinggi video
+    // Atur tampilan peta
     if (isKmlAvailable) {
       mapContainer.style.display = "block";
-      videoFrame.style.height = "50vh";
-  
+      
       if (!map) {
         map = L.map("modalMap").setView([-6.2, 106.8], 15);
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/' +
@@ -319,22 +369,24 @@
       }
   
       currentKml = omnivore.kml(flight.kml).addTo(map);
+    } else {
+      modalBody.classList.add("no-map");
+      mapContainer.style.display = "none";
+    }
   
-      modal.show();
-      document.getElementById("flightModal").addEventListener("shown.bs.modal", () => {
+    modal.show();
+    
+    // Handle map resize after modal is shown
+    document.getElementById("flightModal").addEventListener("shown.bs.modal", () => {
+      if (map) {
         setTimeout(() => {
           map.invalidateSize();
           if (currentKml && currentKml.getBounds) {
             map.fitBounds(currentKml.getBounds());
           }
         }, 300);
-      }, { once: true });
-  
-    } else {
-      mapContainer.style.display = "none";
-      videoFrame.style.height = "100vh"; // Ubah tinggi video jadi penuh
-      modal.show();
-    }
+      }
+    }, { once: true });
   }
 </script>
 
